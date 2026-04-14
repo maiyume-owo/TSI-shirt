@@ -53,7 +53,7 @@ the formula = {curr_formula}
 
 {format_date_vn(curr_shirt_date)}
 
-tuần tiếp theo: ({format_date_vn(next_shirt_date)} mặc áo của tuần tiếp)
+tuần tiếp theo: ({format_date_vn(next_shirt_date)} là ngày mặc áo của tuần tiếp)
 """
     return content
 
