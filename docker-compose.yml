@@ -8,7 +8,7 @@ services:
     environment:
       - TZ=Asia/Ho_Chi_Minh
     env_file:
-      - .env
+      - config.env
     volumes:
       # Mount the state file so that schedule.json survives container restarts
       - ./schedule.json:/app/schedule.json

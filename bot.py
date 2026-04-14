@@ -9,7 +9,7 @@ from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 import pytz
 
-load_dotenv()
+load_dotenv("config.env")
 
 SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
