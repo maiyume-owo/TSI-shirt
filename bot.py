@@ -140,7 +140,7 @@ async def update_uptime_status():
     # Format dynamically to handle plurals
     day_str = f"{days} day{'s' if days != 1 else ''}"
     min_str = f"{minutes} minute{'s' if minutes != 1 else ''}"
-    status_text = f"uptime of the containers is {day_str} {min_str}"
+    status_text = f"containers uptime {day_str} {min_str}"
     
     activity = discord.Game(name=status_text)
     await client.change_presence(status=discord.Status.online, activity=activity)
