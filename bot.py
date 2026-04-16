@@ -8,9 +8,12 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 import pytz
+import discord
+from discord.ext import tasks
 
 load_dotenv("config.env")
 
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
 RECIPIENT_EMAILS = os.getenv("RECIPIENT_EMAILS", "").split(",")
@@ -118,40 +121,72 @@ def get_saved_shirt_date(monday_date):
     shirt_date, _ = calculate_shirt_day(monday_date)
     return shirt_date
 
-def daemon_loop():
+last_sunday_email_date = None
+last_morning_email_date = None
+START_TIME = datetime.now()
+
+# Initialize Discord client
+intents = discord.Intents.default()
+client = discord.Client(intents=intents)
+
+@tasks.loop(minutes=1)
+async def update_uptime_status():
+    """Updates the Discord bot's activity with the current container uptime."""
+    delta = datetime.now() - START_TIME
+    days = delta.days
+    # delta.seconds gives seconds within the current day
+    minutes = (delta.seconds // 60)
+    
+    # Format dynamically to handle plurals
+    day_str = f"{days} day{'s' if days != 1 else ''}"
+    min_str = f"{minutes} minute{'s' if minutes != 1 else ''}"
+    status_text = f"uptime of the containers is {day_str} {min_str}"
+    
+    activity = discord.Game(name=status_text)
+    await client.change_presence(status=discord.Status.online, activity=activity)
+
+@update_uptime_status.before_loop
+async def before_update_uptime_status():
+    await client.wait_until_ready()
+
+@tasks.loop(minutes=1)
+async def daemon_loop_task():
+    global last_sunday_email_date, last_morning_email_date
+    now = get_now()
+    
+    # Every Monday at 00:00, refresh state
+    if now.weekday() == 0 and now.hour == 0 and now.minute == 0:
+        update_schedule_state()
+
+    curr_monday = get_monday(now.date())
+    next_monday = curr_monday + timedelta(days=7)
+
+    # TRIGGER 1: Sunday 9:00 PM for the upcoming week
+    if now.weekday() == 6 and now.hour == 21 and now.minute == 0:
+        if last_sunday_email_date != now.date():
+            body = generate_email_content(next_monday, next_monday + timedelta(days=7))
+            send_email(SUBJECT, body)
+            last_sunday_email_date = now.date()
+
+    # TRIGGER 2: Calculated shirt day at 7:45 AM
+    shirt_date = get_saved_shirt_date(curr_monday)
+    if now.date() == shirt_date and now.hour == 7 and now.minute == 45:
+        if last_morning_email_date != now.date():
+            body = generate_email_content(curr_monday, next_monday)
+            send_email(SUBJECT, body)
+            last_morning_email_date = now.date()
+
+@daemon_loop_task.before_loop
+async def before_daemon_loop_task():
+    await client.wait_until_ready()
+
+@client.event
+async def on_ready():
+    print(f"[{get_now().strftime('%Y-%m-%d %H:%M:%S')}] Discord Bot logged in as {client.user}")
     print(f"[{get_now().strftime('%Y-%m-%d %H:%M:%S')}] Starting TSI Shirt Bot daemon...")
     update_schedule_state()
-    
-    # Keep track of when we last sent emails to prevent spamming within the same minute
-    last_sunday_email_date = None
-    last_morning_email_date = None
-    
-    while True:
-        now = get_now()
-        
-        # Every Monday at 00:00, refresh state
-        if now.weekday() == 0 and now.hour == 0 and now.minute == 0:
-            update_schedule_state()
-
-        curr_monday = get_monday(now.date())
-        next_monday = curr_monday + timedelta(days=7)
-
-        # TRIGGER 1: Sunday 9:00 PM for the upcoming week
-        if now.weekday() == 6 and now.hour == 21 and now.minute == 0:
-            if last_sunday_email_date != now.date():
-                body = generate_email_content(next_monday, next_monday + timedelta(days=7))
-                send_email(SUBJECT, body)
-                last_sunday_email_date = now.date()
-
-        # TRIGGER 2: Calculated shirt day at 7:45 AM
-        shirt_date = get_saved_shirt_date(curr_monday)
-        if now.date() == shirt_date and now.hour == 7 and now.minute == 45:
-            if last_morning_email_date != now.date():
-                body = generate_email_content(curr_monday, next_monday)
-                send_email(SUBJECT, body)
-                last_morning_email_date = now.date()
-
-        time.sleep(60)
+    daemon_loop_task.start()
+    update_uptime_status.start()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TSI Shirt Reminder Bot")
@@ -173,4 +208,7 @@ if __name__ == "__main__":
         else:
             print("Failed to send test email. Check your .env configuration.")
     else:
-        daemon_loop()
+        if not DISCORD_TOKEN:
+            print("ERROR: DISCORD_TOKEN is missing in the .env file.")
+        else:
+            client.run(DISCORD_TOKEN)
