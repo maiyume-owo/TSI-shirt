@@ -1,0 +1,110 @@
+TSI SHIRT BOT - DEPLOYMENT GUIDE
+==================================
+
+This is a Discord bot that sends email notifications about TSI shirt-wearing days.
+It requires Docker and Docker Compose to run.
+
+
+PREREQUISITES
+-------------
+- Docker Desktop installed and running
+- Git (to clone the repository)
+- A Discord bot token
+- A Gmail account (or SMTP-compatible email) for sending notifications
+
+
+STEP 1 — FILL IN CONFIG
+------------------------
+Open config.env and fill in all four values:
+
+    DISCORD_TOKEN=<your Discord bot token>
+    SENDER_EMAIL=<gmail address that sends notifications, e.g. yourbot@gmail.com>
+    SENDER_PASSWORD=<app password for that Gmail account>
+    RECIPIENT_EMAILS=<comma-separated list of recipient emails, e.g. a@x.com,b@x.com>
+
+Notes:
+- For Gmail, use an App Password (not your login password).
+  Go to: Google Account > Security > 2-Step Verification > App Passwords
+- DISCORD_TOKEN: create a bot at https://discord.com/developers/applications
+  then copy the token from Bot > Token.
+- Never commit config.env to git (it contains secrets).
+
+
+STEP 2 — BUILD AND START
+-------------------------
+Open a terminal in the project folder and run:
+
+    docker compose up -d --build
+
+This builds the image and starts the bot in the background.
+
+
+STEP 3 — VERIFY IT IS RUNNING
+------------------------------
+Check that the container started successfully:
+
+    docker compose ps
+
+You should see tsi_shirt_bot with status "Up".
+
+View live logs:
+
+    docker logs -f tsi_shirt_bot
+
+
+STEP 4 — ADD THE BOT TO YOUR DISCORD SERVER
+--------------------------------------------
+1. Go to https://discord.com/developers/applications
+2. Select your application > OAuth2 > URL Generator
+3. Scopes: bot
+4. Bot Permissions: Send Messages, Read Messages/View Channels
+5. Copy the generated URL and open it in a browser to invite the bot.
+
+
+STOPPING THE BOT
+----------------
+    docker compose down
+
+
+RESTARTING AFTER A CODE CHANGE
+-------------------------------
+    docker compose up -d --build
+
+The --build flag rebuilds the image with the latest code.
+
+
+PERSISTENT STATE
+----------------
+schedule.json is mounted from the host into the container at /app/schedule.json.
+This means the schedule state survives container restarts and image rebuilds.
+Make sure schedule.json exists in the project folder before starting:
+
+    If it does not exist yet, create an empty one:
+        echo {} > schedule.json   (PowerShell)
+        echo '{}' > schedule.json (bash/Linux)
+
+
+RUNNING WITHOUT DOCKER (local development)
+------------------------------------------
+1. Create a virtual environment:
+       python -m venv venv
+       venv\Scripts\activate        (Windows)
+       source venv/bin/activate     (Linux/macOS)
+
+2. Install dependencies:
+       pip install -r requirements.txt
+
+3. Make sure config.env is filled in (see Step 1).
+
+4. Run the bot:
+       python bot.py
+
+
+TROUBLESHOOTING
+---------------
+- Container exits immediately: run `docker logs tsi_shirt_bot` to see the error.
+  Most likely cause is missing or wrong values in config.env.
+- Email not sending: check that the Gmail App Password is correct and that
+  "Less secure app access" or App Passwords are enabled on the account.
+- Bot not responding in Discord: confirm the bot has been invited to the server
+  and has permission to read and send messages in the channel.
