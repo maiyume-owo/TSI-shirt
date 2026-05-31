@@ -100,6 +100,27 @@ RUNNING WITHOUT DOCKER (local development)
        python bot.py
 
 
+TESTING EMAIL WITHOUT STARTING THE BOT
+---------------------------------------
+The --test flag sends a real email immediately and exits — no Discord connection,
+no scheduler. Useful for verifying config.env is correct before a full deploy.
+
+Locally (after activating the virtual environment):
+
+    python bot.py --test
+
+Inside the running Docker container:
+
+    docker exec tsi_shirt_bot python bot.py --test
+
+What happens:
+- Prints the generated email body to the terminal
+- Sends an actual email to RECIPIENT_EMAILS with subject "[TEST] Thông báo ngày mặc áo TSI"
+- Exits immediately after
+
+If config.env is incomplete it will print an error instead of sending.
+
+
 TROUBLESHOOTING
 ---------------
 - Container exits immediately: run `docker logs tsi_shirt_bot` to see the error.
